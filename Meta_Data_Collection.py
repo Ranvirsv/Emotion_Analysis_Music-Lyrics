@@ -130,13 +130,7 @@ class MetaDataCollection:
                         if artist_name and title_name:
                             metadata.append((artist_name, title_name))
 
-                    # For YouTube, assume 'track' key may not be present
                     elif source == "youtube":
-                        # YouTube metadata might differ; adapt accordingly
-                        # Example: Assuming 'title' contains both artist and song title separated by a dash
-                        vid = source_data.get("vid", "")
-                        # Without specific structure, we cannot extract artist/title from YouTube
-                        # So, we skip or implement custom logic if available
                         continue
 
                 except (KeyError, IndexError, TypeError):

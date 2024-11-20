@@ -61,11 +61,13 @@ class AudDMetaDataCollection:
             "release_date": "Not Found"
         }
 
-        metadata["artists"] = result_dict.get("artists", "Not Found")
+        metadata["artist"] = result_dict.get("artist", "Not Found")
         metadata["title"] = result_dict.get("title", "Not Found")
         metadata["genres"] = result_dict.get("genreNames", "Not Found")
         metadata["release_date"] = result_dict.get("release_date", "Not Found")
         metadata["label"] = result_dict.get("label", "Not Found")
+        
+        return metadata
         
     def process_audio_files(self, output_csv):
         """
@@ -94,6 +96,7 @@ class AudDMetaDataCollection:
             
         df = pd.DataFrame(metadata)
         if os.path.exists(output_csv):
+            print("Exist")
             df.to_csv(output_csv, mode='a', header=False, index=False)
         else:
             df.to_csv(output_csv, index=False)

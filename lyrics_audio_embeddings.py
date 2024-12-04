@@ -51,13 +51,19 @@ def process_audio(file_path, device):
         # Generate embedding
         with torch.no_grad():
             embedding = audio_transformer(waveform)
-            return embedding.cpu().numpy()
+            return embedding.cpu().detach().numpy()
     except Exception as e:
         print(f"Error processing {file_path}: {str(e)}")
         return None
 
-def process_and_save_audio_embeddings(input_folder, output_file):
-    """Process all audio files and save embeddings"""
+def process_and_save_audio_embeddings(input_folder, output_file, batch_size=50):
+    """
+    Process all audio files in batches and save embeddings.
+    Args:
+        input_folder (str): Path to the folder containing audio files.
+        output_file (str): Path to save embeddings.
+        batch_size (int): Number of audio files to process in a batch.
+    """
     device = setup_audio_backend()
     audio_transformer.to(device)
     audio_transformer.eval()
@@ -65,20 +71,43 @@ def process_and_save_audio_embeddings(input_folder, output_file):
     embeddings = []
     song_ids = []
     mp3_files = [f for f in os.listdir(input_folder) if f.endswith('.mp3')]
+    total_files = len(mp3_files)
 
-    for idx, file_name in enumerate(mp3_files, 1):
-        file_path = os.path.join(input_folder, file_name)
-        embedding = process_audio(file_path, device)
-        if embedding is not None:
-            embeddings.append(embedding)
-            song_ids.append(file_name.replace('.mp3', ''))
-            print(f"Successfully processed {file_name}")
-        else:
-            print(f"Failed to process {file_name}")
+    print(f"Found {total_files} audio files. Processing in batches of {batch_size}...")
 
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    for batch_start in range(0, total_files, batch_size):
+        batch_files = mp3_files[batch_start:batch_start + batch_size]
+        print(f"Processing batch {batch_start // batch_size + 1} with {len(batch_files)} files...")
+
+        batch_embeddings = []
+        batch_song_ids = []
+
+        for file_name in batch_files:
+            file_path = os.path.join(input_folder, file_name)
+            embedding = process_audio(file_path, device)
+            if embedding is not None:
+                batch_embeddings.append(embedding)
+                batch_song_ids.append(file_name.replace('.mp3', ''))
+                print(f"Processed: {file_name}")
+            else:
+                print(f"Failed: {file_name}")
+
+        embeddings.extend(batch_embeddings)
+        song_ids.extend(batch_song_ids)
+
+        # Save the batch embeddings to reduce memory usage
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        np.savez(
+            f"{output_file}_batch_{batch_start // batch_size + 1}.npz",
+            song_ids=batch_song_ids,
+            embeddings=batch_embeddings
+        )
+        print(f"Batch {batch_start // batch_size + 1} saved.")
+
+    # Combine and save all batches into a single file
     np.savez(output_file, song_ids=song_ids, embeddings=embeddings)
-    print(f"Audio embeddings saved to {output_file}")
+    print(f"All audio embeddings saved to {output_file}")
+
 
 def process_and_save_lyrics_embeddings(input_folder, output_file):
     """Process all lyrics files and save embeddings"""
@@ -107,7 +136,7 @@ def process_and_save_lyrics_embeddings(input_folder, output_file):
                     chunk_embeddings.append(chunk_embedding)
 
             aggregated_embedding = torch.mean(torch.stack(chunk_embeddings), dim=0)
-            embeddings.append(aggregated_embedding.numpy())
+            embeddings.append(aggregated_embedding.detach().numpy())
             song_ids.append(file_name.replace('.txt', ''))
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
